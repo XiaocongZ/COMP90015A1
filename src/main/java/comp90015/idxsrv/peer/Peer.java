@@ -47,13 +47,32 @@ public class Peer implements IPeer {
 	/*
 	 * Students are to implement the interface below.
 	 */
-	
+
+	/**
+	 * Send a {@link comp90015.idxsrv.message.ShareRequest} to index server.
+	 * Set up {@link comp90015.idxsrv.server.IOThread} to listen to incoming {@link comp90015.idxsrv.message.BlockRequest}.
+	 * Need to create a new thread for seeding.
+	 * @param file The file to share index to server
+	 * @param idxAddress Address of index server
+	 * @param idxPort Listening port of index server
+	 * @param idxSecret password for index server
+	 * @param shareSecret password for the file
+	 */
 	@Override
 	public void shareFileWithIdxServer(File file, InetAddress idxAddress, int idxPort, String idxSecret,
 			String shareSecret) {
 		tgui.logError("shareFileWithIdxServer unimplemented");
 	}
 
+	/**
+	 * Send a {@link comp90015.idxsrv.message.SearchRequest} to index server.
+	 * Parse the {@link comp90015.idxsrv.message.SearchReply}.
+	 * @param keywords
+	 * @param maxhits
+	 * @param idxAddress
+	 * @param idxPort
+	 * @param idxSecret
+	 */
 	@Override
 	public void searchIdxServer(String[] keywords, 
 			int maxhits, 
@@ -63,12 +82,30 @@ public class Peer implements IPeer {
 		tgui.logError("searchIdxServer unimplemented");
 	}
 
+	/**
+	 * Send a {@link comp90015.idxsrv.message.DropShareRequest} to index server.
+	 * Parse the {@link comp90015.idxsrv.message.DropShareReply}.
+	 * Stop listening to incoming {@link comp90015.idxsrv.message.BlockRequest}.
+	 * @param relativePathname the filename relative to the `basedir`
+	 * @param shareRecord describes the shared file to drop
+	 * @return
+	 */
 	@Override
 	public boolean dropShareWithIdxServer(String relativePathname, ShareRecord shareRecord) {
 		tgui.logError("dropShareWithIdxServer unimplemented");
 		return false;
 	}
 
+	/**
+	 * Start a session.
+	 * Send {@link comp90015.idxsrv.message.BlockRequest}.
+	 * parse {@link comp90015.idxsrv.message.BlockReply}.
+	 * Verify MD5 Hash value, store file block.
+	 * End session.
+	 * Manage concurrency, keep record of share and get.
+	 * @param relativePathname
+	 * @param searchRecord
+	 */
 	@Override
 	public void downloadFromPeers(String relativePathname, SearchRecord searchRecord) {
 		tgui.logError("downloadFromPeers unimplemented");
