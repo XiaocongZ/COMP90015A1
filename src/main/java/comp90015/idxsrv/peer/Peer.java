@@ -1,15 +1,18 @@
 package comp90015.idxsrv.peer;
 
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import comp90015.idxsrv.message.*;
 import comp90015.idxsrv.server.IOThread;
 import comp90015.idxsrv.textgui.ISharerGUI;
 
+import comp90015.idxsrv.filemgr.FileDescr;
 /**
  * Skeleton Peer class to be completed for Project 1.
  * @author aaron
@@ -61,7 +64,36 @@ public class Peer implements IPeer {
 	@Override
 	public void shareFileWithIdxServer(File file, InetAddress idxAddress, int idxPort, String idxSecret,
 			String shareSecret) {
-		tgui.logError("shareFileWithIdxServer unimplemented");
+		try {
+			RandomAccessFile rAFile = new RandomAccessFile(file, "r");
+			FileDescr fileDesc = new FileDescr(rAFile);
+			ShareRequest sReq = new ShareRequest(fileDesc, file.getName(), shareSecret, port);
+
+			Socket socket = new Socket(idxAddress, idxPort);
+			InputStream inputStream = socket.getInputStream();
+			OutputStream outputStream = socket.getOutputStream();
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+
+			AuthenticateRequest aReq = new AuthenticateRequest(idxSecret);
+			writeMsg(bufferedWriter, aReq);
+			AuthenticateReply aRep = (AuthenticateReply) readMsg(bufferedReader);
+			if( !aRep.success){
+				throw new IOException("Authentication Failure");
+			}
+			writeMsg(bufferedWriter, sReq);
+			ShareReply sRep = (ShareReply) readMsg(bufferedReader);
+			tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
+		}
+		catch (IOException e){
+			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
+		}
+		catch (NoSuchAlgorithmException e){
+			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
+		} catch (JsonSerializationException e) {
+			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
+		}
+
 	}
 
 	/**
@@ -109,6 +141,30 @@ public class Peer implements IPeer {
 	@Override
 	public void downloadFromPeers(String relativePathname, SearchRecord searchRecord) {
 		tgui.logError("downloadFromPeers unimplemented");
+	}
+
+
+	/*
+	 * Methods for writing and reading messages.
+	 * copied from server
+	 */
+
+	private void writeMsg(BufferedWriter bufferedWriter, Message msg) throws IOException {
+		//logger.logDebug("sending: "+msg.toString());
+		bufferedWriter.write(msg.toString());
+		bufferedWriter.newLine();
+		bufferedWriter.flush();
+	}
+
+	private Message readMsg(BufferedReader bufferedReader) throws IOException, JsonSerializationException {
+		String jsonStr = bufferedReader.readLine();
+		if(jsonStr!=null) {
+			Message msg = (Message) MessageFactory.deserialize(jsonStr);
+			//logger.logDebug("received: "+msg.toString());
+			return msg;
+		} else {
+			throw new IOException();
+		}
 	}
 	
 }
