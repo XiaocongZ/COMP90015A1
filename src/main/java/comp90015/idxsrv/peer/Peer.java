@@ -21,17 +21,17 @@ import comp90015.idxsrv.filemgr.FileDescr;
 public class Peer implements IPeer {
 
 	private IOThread ioThread;
-	
+
 	private LinkedBlockingDeque<Socket> incomingConnections;
-	
+
 	private ISharerGUI tgui;
-	
+
 	private String basedir;
-	
+
 	private int timeout;
-	
+
 	private int port;
-	
+
 	public Peer(int port, String basedir, int socketTimeout, ISharerGUI tgui) throws IOException {
 		this.tgui=tgui;
 		this.port=port;
@@ -40,13 +40,13 @@ public class Peer implements IPeer {
 		ioThread = new IOThread(port,incomingConnections,socketTimeout,tgui);
 		ioThread.start();
 	}
-	
+
 	public void shutdown() throws InterruptedException, IOException {
 		ioThread.shutdown();
 		ioThread.interrupt();
 		ioThread.join();
 	}
-	
+
 	/*
 	 * Students are to implement the interface below.
 	 */
@@ -74,6 +74,9 @@ public class Peer implements IPeer {
 			OutputStream outputStream = socket.getOutputStream();
 			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
 			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+
+			WelcomeMsg welcomeMsg = (WelcomeMsg) readMsg(bufferedReader);
+			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
 
 			AuthenticateRequest aReq = new AuthenticateRequest(idxSecret);
 			writeMsg(bufferedWriter, aReq);
@@ -106,10 +109,10 @@ public class Peer implements IPeer {
 	 * @param idxSecret
 	 */
 	@Override
-	public void searchIdxServer(String[] keywords, 
-			int maxhits, 
-			InetAddress idxAddress, 
-			int idxPort, 
+	public void searchIdxServer(String[] keywords,
+			int maxhits,
+			InetAddress idxAddress,
+			int idxPort,
 			String idxSecret) {
 		tgui.logError("searchIdxServer unimplemented");
 	}
@@ -166,5 +169,5 @@ public class Peer implements IPeer {
 			throw new IOException();
 		}
 	}
-	
+
 }
