@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import comp90015.idxsrv.filemgr.FileMgr;
 import comp90015.idxsrv.message.*;
 import comp90015.idxsrv.server.IOThread;
 import comp90015.idxsrv.textgui.ISharerGUI;
@@ -21,6 +22,8 @@ import comp90015.idxsrv.filemgr.FileDescr;
 public class Peer implements IPeer {
 
 	private IOThread ioThread;
+
+	private Thread shareMgrThread;
 
 	private LinkedBlockingDeque<Socket> incomingConnections;
 
@@ -37,14 +40,22 @@ public class Peer implements IPeer {
 		this.port=port;
 		this.timeout=socketTimeout;
 		this.basedir=new File(basedir).getCanonicalPath();
+		incomingConnections = new LinkedBlockingDeque<>();
 		ioThread = new IOThread(port,incomingConnections,socketTimeout,tgui);
 		ioThread.start();
+
+		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, tgui));
+		shareMgrThread.start();
+
 	}
 
 	public void shutdown() throws InterruptedException, IOException {
 		ioThread.shutdown();
 		ioThread.interrupt();
 		ioThread.join();
+
+		shareMgrThread.interrupt();
+		shareMgrThread.join();
 	}
 
 	/*
@@ -65,8 +76,11 @@ public class Peer implements IPeer {
 	public void shareFileWithIdxServer(File file, InetAddress idxAddress, int idxPort, String idxSecret,
 			String shareSecret) {
 		try {
-			RandomAccessFile rAFile = new RandomAccessFile(file, "r");
-			FileDescr fileDesc = new FileDescr(rAFile);
+			tgui.logDebug(file.getCanonicalPath());
+			tgui.logDebug(file.getPath());
+			FileMgr fileMgr = new FileMgr(file.getPath());
+
+			FileDescr fileDesc = fileMgr.getFileDescr();
 			ShareRequest sReq = new ShareRequest(fileDesc, file.getName(), shareSecret, port);
 
 			Socket socket = new Socket(idxAddress, idxPort);
@@ -84,18 +98,31 @@ public class Peer implements IPeer {
 			if( !aRep.success){
 				throw new IOException("Authentication Failure");
 			}
-			writeMsg(bufferedWriter, sReq);
-			ShareReply sRep = (ShareReply) readMsg(bufferedReader);
-			tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
+			else{
+				writeMsg(bufferedWriter, sReq);
+				ShareReply sRep = (ShareReply) readMsg(bufferedReader);
+
+				ShareRecord sRec = new ShareRecord( fileMgr, sRep.numSharers, "Seeding", idxAddress, idxPort, idxSecret, shareSecret);
+
+				tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
+				//TODO make it relative path.
+				tgui.addShareRecord(file.getPath(), sRec);
+			}
+
 		}
 		catch (IOException e){
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
 		}
 		catch (NoSuchAlgorithmException e){
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
-		} catch (JsonSerializationException e) {
+		}
+		catch (JsonSerializationException e) {
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
 		}
+
+		//set up sharing threads
+		//get connections from incomingConnections
+
 
 	}
 
@@ -123,7 +150,7 @@ public class Peer implements IPeer {
 	 * Stop listening to incoming {@link comp90015.idxsrv.message.BlockRequest}.
 	 * @param relativePathname the filename relative to the `basedir`
 	 * @param shareRecord describes the shared file to drop
-	 * @return
+	 * @return boolean indicating if drop is successful
 	 */
 	@Override
 	public boolean dropShareWithIdxServer(String relativePathname, ShareRecord shareRecord) {
@@ -148,12 +175,12 @@ public class Peer implements IPeer {
 
 
 	/*
-	 * Methods for writing and reading messages.
+	 * Util methods for writing and reading messages.
 	 * copied from server
 	 */
 
 	private void writeMsg(BufferedWriter bufferedWriter, Message msg) throws IOException {
-		//logger.logDebug("sending: "+msg.toString());
+		tgui.logDebug("sending: "+msg.toString());
 		bufferedWriter.write(msg.toString());
 		bufferedWriter.newLine();
 		bufferedWriter.flush();
@@ -163,7 +190,7 @@ public class Peer implements IPeer {
 		String jsonStr = bufferedReader.readLine();
 		if(jsonStr!=null) {
 			Message msg = (Message) MessageFactory.deserialize(jsonStr);
-			//logger.logDebug("received: "+msg.toString());
+			tgui.logDebug("received: "+msg.toString());
 			return msg;
 		} else {
 			throw new IOException();
