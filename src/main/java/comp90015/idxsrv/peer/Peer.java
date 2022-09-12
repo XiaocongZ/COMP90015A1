@@ -6,14 +6,18 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import comp90015.idxsrv.filemgr.FileMgr;
 import comp90015.idxsrv.message.*;
 import comp90015.idxsrv.server.IOThread;
+import comp90015.idxsrv.server.IndexElement;
 import comp90015.idxsrv.textgui.ISharerGUI;
 
 import comp90015.idxsrv.filemgr.FileDescr;
+import comp90015.idxsrv.textgui.PeerGUI;
+
 /**
  * Skeleton Peer class to be completed for Project 1.
  * @author aaron
@@ -44,7 +48,7 @@ public class Peer implements IPeer {
 		ioThread = new IOThread(port,incomingConnections,socketTimeout,tgui);
 		ioThread.start();
 
-		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, tgui));
+		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, (PeerGUI) tgui));
 		shareMgrThread.start();
 
 	}
@@ -119,11 +123,6 @@ public class Peer implements IPeer {
 		catch (JsonSerializationException e) {
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
 		}
-
-		//set up sharing threads
-		//get connections from incomingConnections
-
-
 	}
 
 	/**
@@ -170,7 +169,33 @@ public class Peer implements IPeer {
 	 */
 	@Override
 	public void downloadFromPeers(String relativePathname, SearchRecord searchRecord) {
-		tgui.logError("downloadFromPeers unimplemented");
+		//tgui.logError("downloadFromPeers unimplemented");
+		IndexElement[] indexElementArray;
+		try {
+			FileDescr fileDesc = searchRecord.fileDescr;
+			LookupRequest lReq = new LookupRequest(relativePathname, fileDesc.getFileMd5());
+			Socket socket = new Socket(searchRecord.idxSrvAddress, searchRecord.idxSrvPort);
+			InputStream inputStream = socket.getInputStream();
+			OutputStream outputStream = socket.getOutputStream();
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+
+			writeMsg(bufferedWriter, lReq);
+			LookupReply lRep = (LookupReply) readMsg(bufferedReader);
+
+			indexElementArray = lRep.hits;
+			if(indexElementArray.length == 0){
+				throw new IOException("Lookup Reply return 0 result");
+			}
+
+		} catch (IOException e) {
+			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
+		} catch (JsonSerializationException e) {
+			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
+		}
+
+		//start threads to download from peers
+
 	}
 
 

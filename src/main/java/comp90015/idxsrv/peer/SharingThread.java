@@ -1,7 +1,8 @@
 package comp90015.idxsrv.peer;
 
+import comp90015.idxsrv.filemgr.BlockUnavailableException;
 import comp90015.idxsrv.message.*;
-import comp90015.idxsrv.textgui.ISharerGUI;
+import comp90015.idxsrv.textgui.PeerGUI;
 
 import java.io.*;
 import java.net.Socket;
@@ -10,10 +11,10 @@ import java.nio.charset.StandardCharsets;
 import static java.lang.Thread.interrupted;
 
 public class SharingThread implements Runnable{
-    private ISharerGUI tgui;
+    private PeerGUI tgui;
     private Socket socket;
 
-    public SharingThread(Socket socket, ISharerGUI tgui){
+    public SharingThread(Socket socket, PeerGUI tgui){
         this.tgui = tgui;
         this.socket = socket;
     }
@@ -31,13 +32,31 @@ public class SharingThread implements Runnable{
                 if(msg.getClass() == BlockRequest.class){
                     BlockRequest bReq = (BlockRequest) msg;
                     //TODO reply
+                    ShareRecord sRec = tgui.getShareRecords().get(bReq.fileName);
+                    if(sRec == null){
+                        ErrorMsg eRep = new ErrorMsg("No share record");
+                        writeMsg(bufferedWriter, eRep);
+                        continue;
+                    }
+                    if(!sRec.status.equals("Seeding")){
+                        ErrorMsg eRep = new ErrorMsg("Share Record Status not Seeding");
+                        writeMsg(bufferedWriter, eRep);
+                        continue;
+                    }
+                    String bytes = "";
+                    try{
+                        //TODO get block encode
+                        sRec.fileMgr.readBlock(bReq.blockIdx);
+                    }catch(BlockUnavailableException e){
+
+                    }
+                    BlockReply bRep = new BlockReply(bReq.fileName, bReq.fileMd5, bReq.blockIdx, bytes);
+                    writeMsg(bufferedWriter, bRep);
                 } else if (msg.getClass() == Goodbye.class) {
                     break;
                 }else {
                     throw new IOException("Message unidentified");
                 }
-
-
             }
         }
         catch(JsonSerializationException e){
@@ -45,7 +64,6 @@ public class SharingThread implements Runnable{
         } catch(IOException e){
             Thread.currentThread().interrupt();
         }
-
     }
 
 

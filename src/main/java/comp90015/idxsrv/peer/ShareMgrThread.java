@@ -1,11 +1,9 @@
 package comp90015.idxsrv.peer;
 
-import comp90015.idxsrv.textgui.ISharerGUI;
+import comp90015.idxsrv.textgui.PeerGUI;
 
 import java.net.Socket;
 import java.util.concurrent.LinkedBlockingDeque;
-
-import static java.lang.Thread.interrupted;
 
 /**
  * Manage all requests
@@ -13,14 +11,14 @@ import static java.lang.Thread.interrupted;
  */
 public class ShareMgrThread implements Runnable{
 
-    private ISharerGUI tgui;
+    private PeerGUI tgui;
     private final LinkedBlockingDeque<Socket> incomingConnections;
 
     public void init(){
 
 
     }
-    public ShareMgrThread(LinkedBlockingDeque<Socket> incomingConnections, ISharerGUI tgui){
+    public ShareMgrThread(LinkedBlockingDeque<Socket> incomingConnections, PeerGUI tgui){
         this.tgui = tgui;
         this.incomingConnections = incomingConnections;
 
@@ -28,7 +26,7 @@ public class ShareMgrThread implements Runnable{
 
     @Override
     public void run() {
-       while(!interrupted()){
+       while(!Thread.interrupted()){
            //poll may return null if queue is empty
             Socket socket = incomingConnections.poll();
             if(socket != null){
