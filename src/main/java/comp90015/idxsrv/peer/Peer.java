@@ -5,6 +5,8 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -18,8 +20,11 @@ import comp90015.idxsrv.textgui.ISharerGUI;
 import comp90015.idxsrv.filemgr.FileDescr;
 import comp90015.idxsrv.textgui.PeerGUI;
 
+
+
 /**
  * Skeleton Peer class to be completed for Project 1.
+ * TODO close file
  * @author aaron
  *
  */
@@ -80,37 +85,38 @@ public class Peer implements IPeer {
 	public void shareFileWithIdxServer(File file, InetAddress idxAddress, int idxPort, String idxSecret,
 			String shareSecret) {
 		try {
-			tgui.logDebug(file.getCanonicalPath());
-			tgui.logDebug(file.getPath());
-			FileMgr fileMgr = new FileMgr(file.getPath());
+			String relativePath = getRelativePath(file.getCanonicalPath());
+			FileMgr fileMgr = new FileMgr(relativePath);
 
 			FileDescr fileDesc = fileMgr.getFileDescr();
 			ShareRequest sReq = new ShareRequest(fileDesc, file.getName(), shareSecret, port);
 
 			Socket socket = new Socket(idxAddress, idxPort);
-			InputStream inputStream = socket.getInputStream();
-			OutputStream outputStream = socket.getOutputStream();
-			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+			SocketMgr sMgr = new SocketMgr(socket);
 
-			WelcomeMsg welcomeMsg = (WelcomeMsg) readMsg(bufferedReader);
+
+			WelcomeMsg welcomeMsg = (WelcomeMsg) sMgr.readMsg();
 			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
 
 			AuthenticateRequest aReq = new AuthenticateRequest(idxSecret);
-			writeMsg(bufferedWriter, aReq);
-			AuthenticateReply aRep = (AuthenticateReply) readMsg(bufferedReader);
+			sMgr.writeMsg(aReq);
+			AuthenticateReply aRep = (AuthenticateReply) sMgr.readMsg();
 			if( !aRep.success){
+				socket.close();
 				throw new IOException("Authentication Failure");
+
 			}
 			else{
-				writeMsg(bufferedWriter, sReq);
-				ShareReply sRep = (ShareReply) readMsg(bufferedReader);
+				sMgr.writeMsg(sReq);
+				ShareReply sRep = (ShareReply) sMgr.readMsg();
+				socket.close();
 
 				ShareRecord sRec = new ShareRecord( fileMgr, sRep.numSharers, "Seeding", idxAddress, idxPort, idxSecret, shareSecret);
 
 				tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
 				//TODO make it relative path.
 				tgui.addShareRecord(file.getPath(), sRec);
+
 			}
 
 		}
@@ -170,9 +176,11 @@ public class Peer implements IPeer {
 	@Override
 	public void downloadFromPeers(String relativePathname, SearchRecord searchRecord) {
 		//tgui.logError("downloadFromPeers unimplemented");
-		IndexElement[] indexElementArray;
+		IndexElement[] indexElementArray = null;
+
+		FileDescr fileDesc = null;
 		try {
-			FileDescr fileDesc = searchRecord.fileDescr;
+			fileDesc = searchRecord.fileDescr;
 			LookupRequest lReq = new LookupRequest(relativePathname, fileDesc.getFileMd5());
 			Socket socket = new Socket(searchRecord.idxSrvAddress, searchRecord.idxSrvPort);
 			InputStream inputStream = socket.getInputStream();
@@ -184,9 +192,6 @@ public class Peer implements IPeer {
 			LookupReply lRep = (LookupReply) readMsg(bufferedReader);
 
 			indexElementArray = lRep.hits;
-			if(indexElementArray.length == 0){
-				throw new IOException("Lookup Reply return 0 result");
-			}
 
 		} catch (IOException e) {
 			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
@@ -194,8 +199,29 @@ public class Peer implements IPeer {
 			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
 		}
 
-		//start threads to download from peers
+		if(indexElementArray == null || indexElementArray.length == 0){
+			//TODO handle error
+			return;
+			//throw new IOException("Lookup Reply return 0 result");
+		}
 
+		//create FileMgr for file
+		String filename = indexElementArray[0].filename;
+		FileMgr fileMgr;
+		try{
+			fileMgr = new FileMgr(filename, fileDesc);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
+		}
+
+
+		//start threads to download from peers
+		Thread downloadThread = new Thread(new DownloadThread(fileMgr, indexElementArray, (PeerGUI) tgui));
+		//maybe no need to join.
+		downloadThread.setDaemon(true);
+		downloadThread.start();
 	}
 
 
@@ -220,6 +246,13 @@ public class Peer implements IPeer {
 		} else {
 			throw new IOException();
 		}
+	}
+
+	private String getRelativePath(String canonicalPath){
+		Path pathAbsolute = Paths.get(canonicalPath);
+		Path pathBase = Paths.get(basedir);
+		Path pathRelative = pathBase.relativize(pathAbsolute);
+		return pathRelative.toString();
 	}
 
 }
