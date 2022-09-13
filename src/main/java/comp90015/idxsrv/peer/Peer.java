@@ -146,7 +146,43 @@ public class Peer implements IPeer {
 			InetAddress idxAddress,
 			int idxPort,
 			String idxSecret) {
-		tgui.logError("searchIdxServer unimplemented");
+
+		try {
+			Socket socket = new Socket(idxAddress, idxPort);
+			InputStream inputStream = socket.getInputStream();
+			OutputStream outputStream = socket.getOutputStream();
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+
+			SearchRequest sReq = new SearchRequest(maxhits, keywords);
+
+			WelcomeMsg welcomeMsg = (WelcomeMsg) readMsg(bufferedReader);
+			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
+
+			AuthenticateRequest aReq = new AuthenticateRequest(idxSecret);
+			writeMsg(bufferedWriter, aReq);
+			AuthenticateReply aRep = (AuthenticateReply) readMsg(bufferedReader);
+			if( !aRep.success){
+				throw new IOException("Authentication Failure");
+			}
+			writeMsg(bufferedWriter, sReq);
+			SearchReply sRep = (SearchReply) readMsg(bufferedReader);
+			if (sRep.hits < 1){
+				tgui.logInfo("No such file found.");
+			} else {
+				tgui.logInfo("Search success; numbers of seeders: " + sRep.seedCounts);
+			}
+
+		}
+		catch (IOException e){
+			tgui.logError("searchIdxServer: " + e.getMessage());
+		}
+		catch (NoSuchAlgorithmException e){
+			tgui.logError("searchIdxServer: " + e.getMessage());
+		} catch (JsonSerializationException e) {
+			tgui.logError("searchIdxServer: " + e.getMessage());
+		}
+
 	}
 
 	/**
@@ -159,7 +195,36 @@ public class Peer implements IPeer {
 	 */
 	@Override
 	public boolean dropShareWithIdxServer(String relativePathname, ShareRecord shareRecord) {
-		tgui.logError("dropShareWithIdxServer unimplemented");
+		try {
+			Socket socket = new Socket(shareRecord.idxSrvAddress, shareRecord.idxSrvPort);
+			InputStream inputStream = socket.getInputStream();
+			OutputStream outputStream = socket.getOutputStream();
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+			BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+
+			DropShareRequest dSReq = new DropShareRequest(relativePathname, shareRecord.fileMgr.getFileDescr().getFileMd5(), shareRecord.sharerSecret, shareRecord.idxSrvPort);
+
+			WelcomeMsg welcomeMsg = (WelcomeMsg) readMsg(bufferedReader);
+			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
+
+			AuthenticateRequest aReq = new AuthenticateRequest(shareRecord.idxSrvSecret);
+			writeMsg(bufferedWriter, aReq);
+			AuthenticateReply aRep = (AuthenticateReply) readMsg(bufferedReader);
+			if( !aRep.success){
+				throw new IOException("Authentication Failure");
+			}
+			writeMsg(bufferedWriter, dSReq);
+			DropShareReply dSRep = (DropShareReply) readMsg(bufferedReader);
+			tgui.logInfo("Share dropped successfully");
+		}
+		catch (IOException e){
+			tgui.logError("dropShareWithIdxServer: " + e.getMessage());
+		}
+		catch (NoSuchAlgorithmException e){
+			tgui.logError("dropShareWithIdxServer: " + e.getMessage());
+		} catch (JsonSerializationException e) {
+			tgui.logError("dropShareWithIdxServer: " + e.getMessage());
+		}
 		return false;
 	}
 
