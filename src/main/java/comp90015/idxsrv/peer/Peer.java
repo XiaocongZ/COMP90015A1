@@ -91,32 +91,18 @@ public class Peer implements IPeer {
 			FileDescr fileDesc = fileMgr.getFileDescr();
 			ShareRequest sReq = new ShareRequest(fileDesc, file.getName(), shareSecret, port);
 
-			Socket socket = new Socket(idxAddress, idxPort);
-			SocketMgr sMgr = new SocketMgr(socket);
-
-
-			WelcomeMsg welcomeMsg = (WelcomeMsg) sMgr.readMsg();
-			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
-
-			AuthenticateRequest aReq = new AuthenticateRequest(idxSecret);
-			sMgr.writeMsg(aReq);
-			AuthenticateReply aRep = (AuthenticateReply) sMgr.readMsg();
-			if( !aRep.success){
-				socket.close();
-				throw new IOException("Authentication Failure");
-
-			}
-			else{
-				sMgr.writeMsg(sReq);
-				ShareReply sRep = (ShareReply) sMgr.readMsg();
-				socket.close();
+			Message rep = reqServer(sReq, idxAddress, idxPort, idxSecret);
+			if(rep.getClass() == ErrorMsg.class){
+				tgui.logError("share failed: " + rep.toString());
+				return;
+			} else if (rep.getClass() == ShareReply.class) {
+				ShareReply sRep = (ShareReply) rep;
 
 				ShareRecord sRec = new ShareRecord( fileMgr, sRep.numSharers, "Seeding", idxAddress, idxPort, idxSecret, shareSecret);
 
 				tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
 
 				tgui.addShareRecord(relativePath, sRec);
-
 			}
 
 		}
@@ -124,9 +110,6 @@ public class Peer implements IPeer {
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
 		}
 		catch (NoSuchAlgorithmException e){
-			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
-		}
-		catch (JsonSerializationException e) {
 			tgui.logError("shareFileWithIdxServer: " + e.getMessage());
 		}
 	}
@@ -169,7 +152,7 @@ public class Peer implements IPeer {
 				tgui.logError("No such file found.");
 				return;
 			} else {
-				tgui.logInfo("Search success; numbers of seeders: " + sRep.seedCounts);
+				tgui.logInfo("Search success; numbers of seeders: " + sRep.seedCounts.toString());
 				//update log
 				//one record or multiple? multiple
 				for(int i = 0; i < hits.length; i++){
@@ -245,48 +228,49 @@ public class Peer implements IPeer {
 	 */
 	@Override
 	public void downloadFromPeers(String relativePathname, SearchRecord searchRecord) {
-		//tgui.logError("downloadFromPeers unimplemented");
+
 		IndexElement[] indexElementArray = null;
 
 		FileDescr fileDesc = null;
-		try {
-			fileDesc = searchRecord.fileDescr;
-			LookupRequest lReq = new LookupRequest(relativePathname, fileDesc.getFileMd5());
-			Socket socket = new Socket(searchRecord.idxSrvAddress, searchRecord.idxSrvPort);
-			SocketMgr sMgr = new SocketMgr(socket);
 
-			sMgr.writeMsg(lReq);
-			LookupReply lRep = (LookupReply) sMgr.readMsg();
+		fileDesc = searchRecord.fileDescr;
+		LookupRequest lReq = new LookupRequest(relativePathname, fileDesc.getFileMd5());
 
+		Message rep = reqServer(lReq, searchRecord.idxSrvAddress, searchRecord.idxSrvPort, searchRecord.idxSrvSecret);
+		if(rep.getClass() == ErrorMsg.class){
+			tgui.logError("download failed: " + rep.toString());
+			return;
+		} else if (rep.getClass() == LookupReply.class) {
+			LookupReply lRep = (LookupReply) rep;
 			indexElementArray = lRep.hits;
 
-		} catch (IOException e) {
-			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
-		} catch (JsonSerializationException e) {
-			tgui.logError("downloadFromPeers Lookup Failure: " + e.getMessage());
 		}
 
+
+
 		if(indexElementArray == null || indexElementArray.length == 0){
-			//TODO handle error
+			tgui.logInfo("no lookup result");
 			return;
-			//throw new IOException("Lookup Reply return 0 result");
+
 		}
 
 		//create FileMgr for file
 		String filename = indexElementArray[0].filename;
 		FileMgr fileMgr;
 		try{
-			fileMgr = new FileMgr(filename, fileDesc);
+			fileMgr = new FileMgr(filename + "_test_download", fileDesc);
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			tgui.logDebug("downloadFromPeers fileMgr creation" + e.getMessage());
+			return;
 		} catch (NoSuchAlgorithmException e) {
-			throw new RuntimeException(e);
+			tgui.logDebug("downloadFromPeers fileMgr creation" + e.getMessage());
+			return;
 		}
 
 		//start threads to download from peers
 		Thread downloadThread = new Thread(new DownloadThread(fileMgr, indexElementArray, (PeerGUI) tgui));
 		//maybe no need to join.
-		downloadThread.setDaemon(true);
+		downloadThread.setDaemon(false);
 		downloadThread.start();
 	}
 
@@ -296,6 +280,40 @@ public class Peer implements IPeer {
 		Path pathBase = Paths.get(basedir);
 		Path pathRelative = pathBase.relativize(pathAbsolute);
 		return pathRelative.toString();
+	}
+
+	private Message reqServer(Message reqMsg, InetAddress idxAddress, int idxPort, String idxSrvSecret){
+		Socket socket = null;
+		SocketMgr sMgr = null;
+		try {
+			socket = new Socket(idxAddress, idxPort);
+			sMgr = new SocketMgr(socket);
+		} catch (IOException e) {
+			return new ErrorMsg(e.getMessage());
+		}
+
+
+		try {
+			WelcomeMsg welcomeMsg = (WelcomeMsg) sMgr.readMsg();
+			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
+			AuthenticateRequest aReq = new AuthenticateRequest(idxSrvSecret);
+			sMgr.writeMsg(aReq);
+			AuthenticateReply aRep = (AuthenticateReply) sMgr.readMsg();
+			if (!aRep.success) {
+				sMgr.close();
+				return new ErrorMsg("Authentication Failure");
+			}
+			sMgr.writeMsg(reqMsg);
+			return sMgr.readMsg();
+
+		}catch (Exception e) {
+			try {
+				sMgr.close();
+			} catch (IOException ex) {
+				tgui.logDebug("cannot close sMgr when return error");
+			}
+			return new ErrorMsg(e.getMessage());
+		}
 	}
 
 }

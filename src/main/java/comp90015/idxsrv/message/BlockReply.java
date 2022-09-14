@@ -1,6 +1,7 @@
 package comp90015.idxsrv.message;
 
 import java.util.Base64;
+@JsonSerializable
 public class BlockReply extends Message{
     @JsonElement
     public String fileName;
@@ -13,6 +14,10 @@ public class BlockReply extends Message{
 
     @JsonElement
     public String bytes;
+
+    public BlockReply(){
+
+    }
 
     public BlockReply(String fileName, String fileMd5, Integer blockIdx, byte[] bytes){
         this.fileName = fileName;

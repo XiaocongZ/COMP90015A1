@@ -1,5 +1,5 @@
 package comp90015.idxsrv.message;
-
+@JsonSerializable
 public class BlockRequest extends Message{
     @JsonElement
     public String fileName;
@@ -9,6 +9,10 @@ public class BlockRequest extends Message{
 
     @JsonElement
     public Integer blockIdx;
+
+    public BlockRequest(){
+
+    }
 
     public BlockRequest(String fileName, String fileMd5, Integer blockIdx){
         this.fileName = fileName;

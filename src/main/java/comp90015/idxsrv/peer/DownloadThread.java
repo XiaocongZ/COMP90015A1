@@ -29,6 +29,7 @@ public class DownloadThread implements Runnable{
 
     public DownloadThread(FileMgr fileMgr, IndexElement[] indexElementArray, PeerGUI tgui){
         this.fileMgr = fileMgr;
+        this.socketMgrList = new ArrayList<>();
         this.indexElementList = Arrays.asList(indexElementArray);
         this.toRead = new ArrayList<SocketMgr>();
         this.nextBlock = 0;
@@ -45,6 +46,7 @@ public class DownloadThread implements Runnable{
         for(IndexElement element: indexElementList){
             try{
                 Socket socket = new Socket(element.ip, element.port);
+                //tgui.logDebug("DownloadThread connect " + element.ip + element.port);
                 socketMgrList.add(new SocketMgr(socket));
             }
             catch (IOException e) {
@@ -56,10 +58,12 @@ public class DownloadThread implements Runnable{
             return;
         }
 
-        //
-        FileDescr fileDescr = fileMgr.getFileDescr();
-        while(!fileMgr.isComplete()){
 
+        //tgui.logDebug("fileMgr.getFileDescr before");
+        FileDescr fileDescr = fileMgr.getFileDescr();
+        //tgui.logDebug("fileMgr.getFileDescr after");
+        while(!fileMgr.isComplete()){
+            //tgui.logDebug("fileMgr.isComplete() not true");
             ListIterator<SocketMgr> socketMgrListIterator = socketMgrList.listIterator();
             //send message
             while(socketMgrListIterator.hasNext()){
@@ -70,12 +74,16 @@ public class DownloadThread implements Runnable{
                     break;
                 }
                 //filenames must be the same, guaranteed by lookup reply
+
                 BlockRequest bReq = new BlockRequest(indexElementList.get(0).filename , fileDescr.getFileMd5(), unavailableBlock);
+                tgui.logDebug(indexElementList.get(0).filename + unavailableBlock);
                 try {
                     sMgr.writeMsg(bReq);
+                    tgui.logDebug("sent BlockRequest" + bReq.toString());
                     toRead.add(sMgr);
                 } catch (IOException e) {
                     //remove socket if write fails
+                    tgui.logDebug("write block req failed");
                     socketMgrListIterator.remove();
 
                     if(socketMgrList.isEmpty()){
@@ -84,12 +92,13 @@ public class DownloadThread implements Runnable{
                     }
                 }
             }
-            //read message
+            tgui.logDebug("read message");
             ListIterator<SocketMgr> toReadListIterator = toRead.listIterator();
             while(toReadListIterator.hasNext()){
                 SocketMgr sMgr = socketMgrListIterator.next();
                 Message msg;
                 try {
+
                     msg = sMgr.readMsg();
 
                 } catch (IOException e) {
@@ -101,6 +110,7 @@ public class DownloadThread implements Runnable{
                 }
 
                 if(msg.getClass() == BlockReply.class){
+                    tgui.logDebug("read Block" + msg.toString());
                     BlockReply bRep = (BlockReply) msg;
                     try {
                         fileMgr.writeBlock(bRep.blockIdx, bRep.getBytes());
@@ -136,6 +146,8 @@ public class DownloadThread implements Runnable{
             tgui.logError(e.getMessage());
             return;
         }
+
+        tgui.logInfo("DownloadThread return");
     }
 
 
