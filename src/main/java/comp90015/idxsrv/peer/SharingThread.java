@@ -26,7 +26,8 @@ public class SharingThread implements Runnable{
         try {
             this.socketMgr = new SocketMgr(socket);
         } catch (IOException e) {
-            tgui.logDebug(e.getMessage());
+            tgui.logError(e.getMessage());
+            return;
         }
         try {
 

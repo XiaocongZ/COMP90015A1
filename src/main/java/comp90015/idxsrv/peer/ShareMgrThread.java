@@ -14,10 +14,7 @@ public class ShareMgrThread implements Runnable{
     private PeerGUI tgui;
     private final LinkedBlockingDeque<Socket> incomingConnections;
 
-    public void init(){
 
-
-    }
     public ShareMgrThread(LinkedBlockingDeque<Socket> incomingConnections, PeerGUI tgui){
         this.tgui = tgui;
         this.incomingConnections = incomingConnections;
