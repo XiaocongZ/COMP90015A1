@@ -92,10 +92,11 @@ public class DownloadThread implements Runnable{
                     }
                 }
             }
-            tgui.logDebug("read message");
+            tgui.logDebug("read message" + toRead.size());
             ListIterator<SocketMgr> toReadListIterator = toRead.listIterator();
+
             while(toReadListIterator.hasNext()){
-                SocketMgr sMgr = socketMgrListIterator.next();
+                SocketMgr sMgr = toReadListIterator.next();
                 Message msg;
                 try {
 
