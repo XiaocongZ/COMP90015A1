@@ -97,7 +97,7 @@ public class Peer implements IPeer {
 			FileMgr fileMgr = new FileMgr(relativePath);
 
 			FileDescr fileDesc = fileMgr.getFileDescr();
-			ShareRequest sReq = new ShareRequest(fileDesc, file.getName(), shareSecret, port);
+			ShareRequest sReq = new ShareRequest(fileDesc, relativePath, shareSecret, port);
 
 			Message rep = reqServer(sReq, idxAddress, idxPort, idxSecret);
 			if(rep.getClass() == ErrorMsg.class){
@@ -263,7 +263,7 @@ public class Peer implements IPeer {
 		//start threads to download from peers
 		Thread downloadThread = new Thread(new DownloadThread(fileMgr, indexElementArray, (PeerGUI) tgui));
 		//maybe no need to join.
-		downloadThread.setDaemon(false);
+		downloadThread.setDaemon(true);
 		downloadThread.start();
 	}
 

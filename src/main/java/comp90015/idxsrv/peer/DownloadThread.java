@@ -63,7 +63,7 @@ public class DownloadThread implements Runnable{
         FileDescr fileDescr = fileMgr.getFileDescr();
         //tgui.logDebug("fileMgr.getFileDescr after");
         while(!fileMgr.isComplete()){
-            //tgui.logDebug("fileMgr.isComplete() not true");
+            tgui.logDebug("fileMgr.isComplete() not true");
             ListIterator<SocketMgr> socketMgrListIterator = socketMgrList.listIterator();
             //send message
             while(socketMgrListIterator.hasNext()){
@@ -92,7 +92,7 @@ public class DownloadThread implements Runnable{
                     }
                 }
             }
-            tgui.logDebug("read message" + toRead.size());
+            tgui.logDebug("read message from " + toRead.size());
             ListIterator<SocketMgr> toReadListIterator = toRead.listIterator();
 
             while(toReadListIterator.hasNext()){
@@ -103,7 +103,7 @@ public class DownloadThread implements Runnable{
                     msg = sMgr.readMsg();
 
                 } catch (IOException e) {
-                    tgui.logError(e.getMessage());
+                    tgui.logError("read message " + e.getMessage());
                     continue;
                 } catch (JsonSerializationException e) {
                     tgui.logError(e.getMessage());
@@ -111,13 +111,14 @@ public class DownloadThread implements Runnable{
                 }
 
                 if(msg.getClass() == BlockReply.class){
-                    tgui.logDebug("read Block" + msg.toString());
+
                     BlockReply bRep = (BlockReply) msg;
                     try {
+                        tgui.logDebug("write Block to file" + msg.toString());
                         fileMgr.writeBlock(bRep.blockIdx, bRep.getBytes());
                     } catch (IOException e) {
                         //end thread if cannot access file
-                        tgui.logError(e.getMessage());
+                        tgui.logError("write block error" + e.getMessage());
                         return;
                     }
                 } else if (msg.getClass() == ErrorMsg.class) {
@@ -159,6 +160,7 @@ public class DownloadThread implements Runnable{
         while(fileMgr.isBlockAvailable(nextBlock)){
             nextBlock = (nextBlock + 1) % fileMgr.getFileDescr().getNumBlocks();
         }
+        tgui.logInfo("nextblock: " + nextBlock);
         return nextBlock;
 
     }

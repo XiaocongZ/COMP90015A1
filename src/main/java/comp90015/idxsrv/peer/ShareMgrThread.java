@@ -28,6 +28,7 @@ public class ShareMgrThread implements Runnable{
             Socket socket = incomingConnections.poll();
             if(socket != null){
                 Thread sharingThread= new Thread(new SharingThread(socket, tgui));
+
                 tgui.logDebug("ShareMgr start a sharing thread");
                 sharingThread.start();
             }

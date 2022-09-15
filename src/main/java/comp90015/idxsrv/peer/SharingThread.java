@@ -43,7 +43,7 @@ public class SharingThread implements Runnable{
                         socketMgr.writeMsg(eRep);
                         continue;
                     }
-                    if(!sRec.status.equals("Seeding")){
+                    if(!sRec.status.equals(Peer.SHARE_STATUS.SEEDING.name())){
                         ErrorMsg eRep = new ErrorMsg("Share Record Status not Seeding");
                         socketMgr.writeMsg(eRep);
                         tgui.logDebug(msg.toString());
@@ -69,8 +69,10 @@ public class SharingThread implements Runnable{
             }
         }
         catch(JsonSerializationException e){
+            tgui.logError("Sharing thread JsonSerializationException");
             Thread.currentThread().interrupt();
         } catch(IOException e){
+            tgui.logError("Sharing thread IOException");
             Thread.currentThread().interrupt();
         }
         try {
