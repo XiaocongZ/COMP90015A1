@@ -30,6 +30,10 @@ import comp90015.idxsrv.textgui.PeerGUI;
  */
 public class Peer implements IPeer {
 
+	public enum SHARE_STATUS{
+		SEEDING, STOPPED
+	}
+
 	private IOThread ioThread;
 
 	private Thread shareMgrThread;
@@ -86,6 +90,10 @@ public class Peer implements IPeer {
 			String shareSecret) {
 		try {
 			String relativePath = getRelativePath(file.getCanonicalPath());
+			if(!checkPath(relativePath)){
+				tgui.logError("Path not in basedir");
+				return;
+			}
 			FileMgr fileMgr = new FileMgr(relativePath);
 
 			FileDescr fileDesc = fileMgr.getFileDescr();
@@ -98,7 +106,7 @@ public class Peer implements IPeer {
 			} else if (rep.getClass() == ShareReply.class) {
 				ShareReply sRep = (ShareReply) rep;
 
-				ShareRecord sRec = new ShareRecord( fileMgr, sRep.numSharers, "Seeding", idxAddress, idxPort, idxSecret, shareSecret);
+				ShareRecord sRec = new ShareRecord( fileMgr, sRep.numSharers, SHARE_STATUS.SEEDING.name(), idxAddress, idxPort, idxSecret, shareSecret);
 
 				tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
 
@@ -182,36 +190,21 @@ public class Peer implements IPeer {
 	 */
 	@Override
 	public boolean dropShareWithIdxServer(String relativePathname, ShareRecord shareRecord) {
-		try {
-			Socket socket = new Socket(shareRecord.idxSrvAddress, shareRecord.idxSrvPort);
-			SocketMgr sMgr = new SocketMgr(socket);
 
-			DropShareRequest dSReq = new DropShareRequest(relativePathname, shareRecord.fileMgr.getFileDescr().getFileMd5(), shareRecord.sharerSecret, shareRecord.idxSrvPort);
+		DropShareRequest dReq = new DropShareRequest(relativePathname, shareRecord.fileMgr.getFileDescr().getFileMd5(), shareRecord.sharerSecret, port);
 
-			WelcomeMsg welcomeMsg = (WelcomeMsg) sMgr.readMsg();
-			tgui.logInfo("Server welcome: " + welcomeMsg.toString());
-
-			AuthenticateRequest aReq = new AuthenticateRequest(shareRecord.idxSrvSecret);
-			sMgr.writeMsg(aReq);
-			AuthenticateReply aRep = (AuthenticateReply) sMgr.readMsg();
-			if( !aRep.success){
-				throw new IOException("Authentication Failure");
-			}
-			sMgr.writeMsg(dSReq);
-			DropShareReply dSRep = (DropShareReply) sMgr.readMsg();
-			tgui.logInfo("Share dropped successfully");
-		}
-		catch (IOException e){
-			tgui.logError("dropShareWithIdxServer: " + e.getMessage());
+		Message msg = reqServer(dReq, shareRecord.idxSrvAddress, shareRecord.idxSrvPort, shareRecord.idxSrvSecret);
+		if(msg.getClass() ==ErrorMsg.class){
+			tgui.logInfo("Share dropped failed: " + msg.toString());
 			return false;
 		}
-		catch (JsonSerializationException e) {
-			tgui.logError("dropShareWithIdxServer: " + e.getMessage());
-			return false;
-		}
+		tgui.logInfo("Share dropped successfully");
 
-		//drop ShareRecord
-		tgui.getShareRecords().remove(relativePathname);
+
+		//update ShareRecord
+		//note: textgui will remove it anyway, so useless for now
+		ShareRecord droppedRecord = new ShareRecord(shareRecord.fileMgr, shareRecord.numSharers, SHARE_STATUS.STOPPED.name(), shareRecord.idxSrvAddress, shareRecord.idxSrvPort, shareRecord.idxSrvSecret, shareRecord.sharerSecret);
+		tgui.addShareRecord(relativePathname, droppedRecord);
 
 		return true;
 	}
@@ -282,6 +275,14 @@ public class Peer implements IPeer {
 		return pathRelative.toString();
 	}
 
+	private boolean checkPath(String relativePath){
+		if(relativePath.length() >=2 && relativePath.substring(0, 2).equals("..")){
+			return false;
+		}
+		return true;
+	}
+
+	//return message, error or reply
 	private Message reqServer(Message reqMsg, InetAddress idxAddress, int idxPort, String idxSrvSecret){
 		Socket socket = null;
 		SocketMgr sMgr = null;
@@ -312,6 +313,7 @@ public class Peer implements IPeer {
 			} catch (IOException ex) {
 				tgui.logDebug("cannot close sMgr when return error");
 			}
+			tgui.logError(e.getMessage());
 			return new ErrorMsg(e.getMessage());
 		}
 	}
