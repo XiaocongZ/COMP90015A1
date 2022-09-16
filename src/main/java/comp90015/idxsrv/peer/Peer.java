@@ -58,6 +58,7 @@ public class Peer implements IPeer {
 		ioThread.start();
 
 		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, (PeerGUI) tgui));
+		shareMgrThread.setDaemon(true);
 		shareMgrThread.start();
 
 	}
