@@ -149,7 +149,8 @@ public class DownloadThread implements Runnable{
             return;
         }
 
-        tgui.logInfo("DownloadThread return");
+        tgui.logInfo("Download Complete");
+        return;
     }
 
 

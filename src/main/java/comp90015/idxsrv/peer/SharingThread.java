@@ -6,6 +6,7 @@ import comp90015.idxsrv.textgui.PeerGUI;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.HashMap;
 
 import static java.lang.Thread.interrupted;
 
@@ -13,12 +14,14 @@ public class SharingThread implements Runnable{
     private PeerGUI tgui;
     private Socket socket;
 
+    private HashMap<String,ShareRecord> shareRecords;
+
     private SocketMgr socketMgr;
 
-    public SharingThread(Socket socket, PeerGUI tgui){
+    public SharingThread(Socket socket, PeerGUI tgui, HashMap<String,ShareRecord> shareRecords){
         this.tgui = tgui;
         this.socket = socket;
-
+        this.shareRecords = shareRecords;
     }
 
     @Override
@@ -36,8 +39,8 @@ public class SharingThread implements Runnable{
                 if(msg.getClass() == BlockRequest.class){
                     BlockRequest bReq = (BlockRequest) msg;
                     tgui.logDebug(msg.toString());
-                    // reply
-                    ShareRecord sRec = tgui.getShareRecords().get(bReq.fileName);
+                    //TODO remove it
+                    ShareRecord sRec = shareRecords.get(bReq.fileName);
                     if(sRec == null){
                         ErrorMsg eRep = new ErrorMsg("AIR No share record for " + bReq.fileName);
                         tgui.logDebug("absent record: " + bReq.fileName);

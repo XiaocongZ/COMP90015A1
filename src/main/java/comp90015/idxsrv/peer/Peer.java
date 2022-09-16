@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 
+import java.util.HashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import comp90015.idxsrv.filemgr.FileMgr;
@@ -42,6 +43,8 @@ public class Peer implements IPeer {
 
 	private PeerGUI tgui;
 
+	private HashMap<String,ShareRecord> shareRecords;
+
 	private String basedir;
 
 	private int timeout;
@@ -56,8 +59,8 @@ public class Peer implements IPeer {
 		incomingConnections = new LinkedBlockingDeque<>();
 		ioThread = new IOThread(port,incomingConnections,socketTimeout,tgui);
 		ioThread.start();
-
-		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, (PeerGUI) tgui));
+		shareRecords = new HashMap<>();
+		shareMgrThread = new Thread(new ShareMgrThread(incomingConnections, (PeerGUI) tgui, shareRecords));
 		shareMgrThread.setDaemon(true);
 		shareMgrThread.start();
 
@@ -112,6 +115,7 @@ public class Peer implements IPeer {
 				tgui.logInfo("Share succeed; number of sharers: " + sRep.numSharers);
 
 				tgui.addShareRecord(relativePath, sRec);
+				this.addShareRecord(relativePath, sRec);
 			}
 
 		}
@@ -205,7 +209,7 @@ public class Peer implements IPeer {
 		//update ShareRecord
 		//note: textgui will remove it anyway, so useless for now
 		ShareRecord droppedRecord = new ShareRecord(shareRecord.fileMgr, shareRecord.numSharers, SHARE_STATUS.STOPPED.name(), shareRecord.idxSrvAddress, shareRecord.idxSrvPort, shareRecord.idxSrvSecret, shareRecord.sharerSecret);
-		tgui.addShareRecord(relativePathname, droppedRecord);
+		this.dropShareRecord(relativePathname);
 
 		return true;
 	}
@@ -321,6 +325,23 @@ public class Peer implements IPeer {
 			tgui.logError(e.getMessage());
 			return new ErrorMsg(e.getMessage());
 		}
+	}
+
+
+	private void addShareRecord(String relativePathname,ShareRecord shareRecord){
+		shareRecords.put(relativePathname, shareRecord);
+		return;
+
+	}
+
+	private void dropShareRecord(String relativePathname){
+		shareRecords.remove(relativePathname);
+		return;
+	}
+
+	private ShareRecord getShareRecord(String relativePathname){
+
+		return shareRecords.get(relativePathname);
 	}
 
 }

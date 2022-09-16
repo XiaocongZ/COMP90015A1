@@ -560,10 +560,6 @@ public class PeerGUI implements ISharerGUI {
 			sharingTable.setEnabled(true);
 		}
 	}
-
-	public HashMap<String,ShareRecord> getShareRecords(){
-		return shareRecords;
-	}
 	
 	@Override
 	public void updateShareRecord(String relativePathname, ShareRecord shareRecord) {

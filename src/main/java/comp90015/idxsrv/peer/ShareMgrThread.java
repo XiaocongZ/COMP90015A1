@@ -3,6 +3,7 @@ package comp90015.idxsrv.peer;
 import comp90015.idxsrv.textgui.PeerGUI;
 
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**
@@ -14,11 +15,13 @@ public class ShareMgrThread implements Runnable{
     private PeerGUI tgui;
     private final LinkedBlockingDeque<Socket> incomingConnections;
 
+    private HashMap<String,ShareRecord> shareRecords;
 
-    public ShareMgrThread(LinkedBlockingDeque<Socket> incomingConnections, PeerGUI tgui){
+
+    public ShareMgrThread(LinkedBlockingDeque<Socket> incomingConnections, PeerGUI tgui, HashMap<String,ShareRecord> shareRecords){
         this.tgui = tgui;
         this.incomingConnections = incomingConnections;
-
+        this.shareRecords = shareRecords;
     }
 
     @Override
@@ -27,7 +30,7 @@ public class ShareMgrThread implements Runnable{
            //poll may return null if queue is empty
             Socket socket = incomingConnections.poll();
             if(socket != null){
-                Thread sharingThread= new Thread(new SharingThread(socket, tgui));
+                Thread sharingThread= new Thread(new SharingThread(socket, tgui, shareRecords));
 
                 tgui.logDebug("ShareMgr start a sharing thread");
                 sharingThread.start();
@@ -42,4 +45,6 @@ public class ShareMgrThread implements Runnable{
     public void shutdown(){
 
     }
+
+
 }
