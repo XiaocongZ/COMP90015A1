@@ -39,7 +39,8 @@ public class SharingThread implements Runnable{
                     // reply
                     ShareRecord sRec = tgui.getShareRecords().get(bReq.fileName);
                     if(sRec == null){
-                        ErrorMsg eRep = new ErrorMsg("No share record");
+                        ErrorMsg eRep = new ErrorMsg("No share record for " + bReq.fileName);
+                        tgui.logDebug("absent record: " + bReq.fileName);
                         socketMgr.writeMsg(eRep);
                         continue;
                     }
