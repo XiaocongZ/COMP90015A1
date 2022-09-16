@@ -101,7 +101,7 @@ public class DownloadThread implements Runnable{
                 try {
 
                     msg = sMgr.readMsg();
-
+                    tgui.logDebug("msg = sMgr.readMsg();");
                 } catch (IOException e) {
                     tgui.logError("read message " + e.getMessage());
                     continue;
@@ -123,7 +123,7 @@ public class DownloadThread implements Runnable{
                     }
                 } else if (msg.getClass() == ErrorMsg.class) {
                     //do nothing here by design
-                    tgui.logDebug(msg.toString());
+                    tgui.logDebug("got ErrorMsg" + msg.toString());
                 }
 
             }
