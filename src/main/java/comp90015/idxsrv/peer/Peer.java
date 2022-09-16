@@ -252,6 +252,10 @@ public class Peer implements IPeer {
 		String filename = indexElementArray[0].filename;
 		FileMgr fileMgr;
 		try{
+			File pFile = new File(filename).getParentFile();
+			if(pFile != null){
+				pFile.mkdirs();
+			}
 			fileMgr = new FileMgr(filename + "_test_download", fileDesc);
 		} catch (IOException e) {
 			tgui.logDebug("downloadFromPeers fileMgr creation" + e.getMessage());
